@@ -9,3 +9,4 @@ module "vpc" {
   storage_subnets         = var.storage_subnets
   tags                    = var.tags
 }
+

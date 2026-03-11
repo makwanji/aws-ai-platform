@@ -13,6 +13,38 @@
 | Storage         | 10.10.30.0/24 | AZ1 | FSx Lustre         |
 | Storage         | 10.10.31.0/24 | AZ2 | Storage            |
 
+## Node Placement
+
+### Create Key Pair
+
+```bash
+# create key pair (ensure local directory exists first)
+aws ec2 create-key-pair \
+  --region ap-southeast-1 \
+  --key-name adnsg-aws-ai-platform \
+  --query 'KeyMaterial' \
+  --output text > ~/.ssh/adnsg-aws-ai-platform.pem
+chmod 400 ~/.ssh/adnsg-aws-ai-platform.pem
+```
+
+### SSH Access
+
+All EC2 instances are launched with the `ssh_key_name` specified in `terraform.tfvars`. Be sure you've created an AWS key pair with that name in the target region (e.g. `ap-southeast-1`). You can connect using:
+
+```bash
+ssh -i ~/.ssh/adnsg-aws-ai-platform.pem ubuntu@<instance_public_ip>
+```
+
+| Component                | Subnet        |
+| ------------------------ | ------------- |
+| Bastion                  | 10.10.1.0/24  |
+| SLURM Controller         | 10.10.20.0/24 |
+| Kubernetes Control Plane | 10.10.20.0/24 |
+| GPU Node 1               | 10.10.10.0/24 |
+| GPU Node 2               | 10.10.11.0/24 |
+| CPU Worker               | 10.10.10.0/24 |
+| FSx Lustre               | 10.10.30.0/24 |
+
 ## Command to create bucket & DynamoDB Table
 
 ```bash

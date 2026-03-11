@@ -4,6 +4,12 @@ variable "vpc_cidr" {
   default     = "10.10.0.0/16"
 }
 
+variable "ssh_key_name" {
+  description = "Name of the SSH key pair to associate with instances (optional)"
+  type        = string
+  default     = null
+}
+
 variable "availability_zones" {
   description = "List of availability zones"
   type        = list(string)

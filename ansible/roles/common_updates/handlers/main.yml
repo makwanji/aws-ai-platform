@@ -1,0 +1,17 @@
+---
+# Handlers for common_updates role
+
+- name: restart networking
+  service:
+    name: network
+    state: restarted
+  when: detected_os == "RedHat" or detected_os == "Amazon"
+
+- name: reboot system
+  reboot:
+    msg: "Rebooting system after updates"
+    connect_timeout: 5
+    reboot_timeout: "{{ reboot_timeout }}"
+    pre_reboot_delay: 10
+    post_reboot_delay: 30
+  when: reboot_after_update | bool or force_reboot | bool

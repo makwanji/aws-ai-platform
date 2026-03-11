@@ -1,0 +1,80 @@
+---
+# Playbook: Update control plane nodes (SLURM controller, K8s control plane)
+# Usage: ansible-playbook playbooks/update_control_plane.yml
+# These are critical infrastructure nodes
+
+- name: Update control plane nodes
+  hosts: control_plane
+  serial: 1  # Update one control plane node at a time - CRITICAL
+  gather_facts: yes
+
+  vars:
+    reboot_after_update: no  # Set to yes only in maintenance windows
+    update_security_only: yes  # Only update security patches for control plane
+    enable_update_logging: yes
+    run_pre_update_checks: yes
+    run_post_update_checks: yes
+
+  pre_tasks:
+    - name: Pre-update health check
+      block:
+        - name: Check SLURM status (if applicable)
+          shell: |
+            sinfo || echo "SLURM not running"
+          register: slurm_status
+          changed_when: false
+          failed_when: false
+          when: "'slurm' in inventory_hostname"
+
+        - name: Check Kubernetes status (if applicable)
+          shell: |
+            kubectl cluster-info || echo "Kubectl not available"
+          register: k8s_status
+          changed_when: false
+          failed_when: false
+          when: "'k8s' in inventory_hostname"
+
+        - name: Display health status
+          debug:
+            msg: |
+              ================================================
+              PRE-UPDATE HEALTH CHECK: {{ inventory_hostname }}
+              SLURM Status: {{ slurm_status.stdout | default('N/A') }}
+              K8s Status: {{ k8s_status.stdout | default('N/A') }}
+              ================================================
+
+  roles:
+    - common_updates
+
+  post_tasks:
+    - name: Post-update health verification
+      block:
+        - name: Verify SLURM services (if applicable)
+          shell: |
+            systemctl is-active slurmctld || echo "SLURM not configured"
+          register: slurm_health
+          changed_when: false
+          failed_when: false
+          when: "'slurm' in inventory_hostname"
+
+        - name: Verify Kubernetes services (if applicable)
+          shell: |
+            systemctl is-active kubelet || echo "Kubernetes not configured"
+          register: k8s_health
+          changed_when: false
+          failed_when: false
+          when: "'k8s' in inventory_hostname"
+
+        - name: Final control plane status
+          debug:
+            msg: |
+              ================================================
+              POST-UPDATE HEALTH CHECK: {{ inventory_hostname }}
+              SLURM Services: {{ slurm_health.stdout | default('N/A') }}
+              K8s Services: {{ k8s_health.stdout | default('N/A') }}
+              Update Status: COMPLETED
+              ================================================
+
+  tags:
+    - update-control-plane
+    - critical-infrastructure

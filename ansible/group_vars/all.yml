@@ -1,0 +1,13 @@
+# Global variables for all hosts
+---
+
+# Update configuration
+update_packages: yes
+reboot_after_update: no  # Set to yes for prod environments
+auto_reboot_wait_timeout: 300
+
+# SSH key path
+ssh_key_path: ~/.ssh/adnsg-aws-ai-platform.pem
+
+# Log settings
+log_directory: /var/log/updates

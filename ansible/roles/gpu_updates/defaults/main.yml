@@ -1,0 +1,28 @@
+---
+# Default variables for GPU updates role
+
+# GPU driver settings
+update_gpu_drivers: yes
+nvidia_driver_version: "latest"  # Options: "latest", "lts", or specific version like "550.54.14"
+
+# CUDA settings
+cuda_version: "12.4"
+install_cuda_toolkit: yes
+
+# GPU packages to install
+gpu_packages:
+  - kernel-devel
+  - gcc
+  - make
+  - dkms
+  - nvidia-driver-latest-dkms
+  - nvidia-utils
+  - nvidia-xconfig
+  - cuda
+
+# GPU specific settings
+gpu_reboot_after_driver_update: yes
+gpu_reboot_timeout: 300
+
+# Verification
+verify_gpu_installation: yes

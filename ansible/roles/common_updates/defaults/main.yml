@@ -1,0 +1,23 @@
+---
+# Default variables for common_updates role
+# These can be overridden in playbooks or inventory
+
+# Package update settings
+update_packages: yes
+update_security_only: no  # If yes, only update security packages
+
+# Distribution detection
+detected_os: "{{ ansible_os_family }}"
+
+# System reboot settings
+reboot_after_update: no
+force_reboot: no
+reboot_timeout: 300
+
+# Update log settings
+enable_update_logging: yes
+log_directory: /var/log/updates
+
+# Pre and post-update hooks
+run_pre_update_checks: yes
+run_post_update_checks: yes

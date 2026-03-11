@@ -1,0 +1,189 @@
+---
+# Tasks for GPU driver and CUDA toolkit updates
+
+- name: Display GPU update information
+  debug:
+    msg: |
+      GPU Update Process Starting on {{ inventory_hostname }}
+      Driver Version: {{ nvidia_driver_version }}
+      CUDA Version: {{ cuda_version }}
+      Auto-Reboot Enabled: {{ gpu_reboot_after_driver_update }}
+  tags:
+    - always
+
+# GPU prerequisite packages
+- name: Install GPU driver prerequisites (RedHat/Amazon Linux)
+  block:
+    - name: Install development packages
+      yum:
+        name:
+          - kernel-devel
+          - kernel-headers
+          - gcc
+          - make
+          - dkms
+          - git
+        state: present
+      register: prereq_install
+
+    - name: Install NVIDIA repository
+      yum:
+        name: https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-repo-rhel8-10.2.89-1.x86_64.rpm
+        state: present
+      ignore_errors: yes
+
+  when: ansible_os_family in ["RedHat", "Amazon"]
+  tags:
+    - gpu-prerequisites
+    - nvidia-setup
+
+- name: Install GPU driver prerequisites (Debian/Ubuntu)
+  block:
+    - name: Install development packages
+      apt:
+        name:
+          - build-essential
+          - linux-headers-generic
+          - dkms
+          - git
+        state: present
+      register: prereq_install
+
+  when: ansible_os_family == "Debian"
+  tags:
+    - gpu-prerequisites
+    - nvidia-setup
+
+# NVIDIA GPU Driver Installation
+- name: NVIDIA GPU Driver Installation
+  block:
+    - name: Add NVIDIA repository (RedHat/Amazon Linux)
+      shell: |
+        amazon-linux-extras install -y epel
+      when: ansible_os_family in ["RedHat", "Amazon"]
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Install NVIDIA GPU driver
+      yum:
+        name: "{{ gpu_packages }}"
+        state: present
+      when: ansible_os_family in ["RedHat", "Amazon"]
+      register: driver_install
+
+    - name: Install NVIDIA GPU driver (Debian/Ubuntu)
+      apt:
+        name: nvidia-driver-latest-dkms
+        state: present
+      when: ansible_os_family == "Debian"
+      register: driver_install
+
+    - name: Load NVIDIA kernel module
+      modprobe:
+        name: nvidia
+        state: present
+      when: driver_install.changed
+
+  when: update_gpu_drivers | bool
+  tags:
+    - nvidia-driver
+    - gpu-update
+
+# CUDA Toolkit Installation
+- name: CUDA Toolkit Installation
+  block:
+    - name: Download CUDA toolkit installer
+      get_url:
+        url: "https://developer.download.nvidia.com/compute/cuda/{{ cuda_version | replace('.', '_') }}/local_installers/cuda_{{ cuda_version }}_linux.run"
+        dest: /tmp/cuda_installer.run
+        mode: '0755'
+      when: install_cuda_toolkit | bool
+
+    - name: Run CUDA installer
+      shell: /tmp/cuda_installer.run --silent --driver --toolkit --samples
+      register: cuda_install
+      failed_when: cuda_install.rc not in [0]
+      when: install_cuda_toolkit | bool
+
+    - name: Set CUDA environment variables
+      lineinfile:
+        path: /etc/profile.d/cuda.sh
+        line: "{{ item }}"
+        create: yes
+        mode: '0755'
+      loop:
+        - 'export CUDA_HOME=/usr/local/cuda'
+        - 'export PATH=$CUDA_HOME/bin:$PATH'
+        - 'export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH'
+      when: install_cuda_toolkit | bool
+
+  when: install_cuda_toolkit | bool
+  tags:
+    - cuda-toolkit
+    - gpu-update
+
+# GPU Verification
+- name: Verify GPU Installation
+  block:
+    - name: Check NVIDIA driver installation
+      shell: nvidia-smi --query-gpu=index,name,driver_version --format=csv,noheader
+      register: gpu_status
+      changed_when: false
+      failed_when: gpu_status.rc != 0
+
+    - name: Display GPU status
+      debug:
+        msg: |
+          GPU Status:
+          {{ gpu_status.stdout }}
+
+    - name: Check CUDA installation
+      shell: nvcc --version
+      register: cuda_status
+      changed_when: false
+      failed_when: cuda_status.rc != 0
+      when: install_cuda_toolkit | bool
+
+    - name: Display CUDA status
+      debug:
+        msg: |
+          CUDA Status:
+          {{ cuda_status.stdout }}
+      when: install_cuda_toolkit | bool
+
+  when: verify_gpu_installation | bool
+  tags:
+    - gpu-verification
+    - gpu-update
+
+# GPU driver reboot
+- name: Reboot after GPU driver update
+  reboot:
+    msg: "Rebooting system after GPU driver update"
+    connect_timeout: 5
+    reboot_timeout: "{{ gpu_reboot_timeout }}"
+    pre_reboot_delay: 10
+    post_reboot_delay: 30
+  when: gpu_reboot_after_driver_update | bool and driver_install.changed
+  tags:
+    - gpu-reboot
+    - reboot
+
+- name: Post GPU update verification
+  block:
+    - name: Re-verify GPU installation after reboot
+      shell: nvidia-smi -q -d compute
+      register: gpu_post_reboot
+      changed_when: false
+      failed_when: gpu_post_reboot.rc != 0
+
+    - name: Display final GPU status
+      debug:
+        msg: |
+          GPU Installation Complete:
+          {{ gpu_post_reboot.stdout }}
+
+  when: gpu_reboot_after_driver_update | bool and driver_install.changed
+  tags:
+    - gpu-verification
+    - gpu-update

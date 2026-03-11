@@ -1,0 +1,55 @@
+---
+# Playbook: Combined OS + GPU updates for GPU compute nodes
+# Usage: ansible-playbook playbooks/update_gpu_nodes_full.yml
+
+- name: Full update for GPU compute nodes
+  hosts: gpu_nodes
+  serial: 1  # Update one GPU node at a time
+  gather_facts: yes
+
+  vars:
+    # OS update settings
+    reboot_after_update: no  # GPU role will handle reboot
+    update_security_only: no
+    enable_update_logging: yes
+
+    # GPU update settings
+    update_gpu_drivers: yes
+    nvidia_driver_version: "latest"
+    cuda_version: "12.4"
+    install_cuda_toolkit: yes
+    gpu_reboot_after_driver_update: yes
+    verify_gpu_installation: yes
+
+  pre_tasks:
+    - name: GPU node update initialization
+      debug:
+        msg: |
+          ================================================
+          FULL GPU NODE UPDATE: {{ inventory_hostname }}
+          Phase 1: OS package updates
+          Phase 2: GPU driver updates
+          Phase 3: CUDA toolkit updates
+          Reboot: YES (after GPU driver install)
+          ================================================
+
+  roles:
+    # First update OS packages
+    - common_updates
+    # Then update GPU drivers and CUDA
+    - gpu_updates
+
+  post_tasks:
+    - name: Full GPU node update summary
+      debug:
+        msg: |
+          ================================================
+          GPU NODE FULL UPDATE COMPLETED: {{ inventory_hostname }}
+          All components have been updated and verified.
+          Node is ready for workloads.
+          ================================================
+
+  tags:
+    - update-gpu-full
+    - gpu-nodes
+    - critical-update

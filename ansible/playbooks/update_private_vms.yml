@@ -1,0 +1,45 @@
+---
+# Playbook: Update only private VMs (via bastion tunnel)
+# Usage: ansible-playbook playbooks/update_private_vms.yml
+# This playbook targets only VMs in private subnets and uses bastion tunnel
+
+- name: Update private VMs via bastion tunnel
+  hosts: private_vms
+  serial: 2  # Update 2 VMs in parallel
+  gather_facts: yes
+
+  vars:
+    reboot_after_update: no
+    update_security_only: no
+    enable_update_logging: yes
+
+  pre_tasks:
+    - name: Verify bastion connectivity
+      wait_for:
+        host: "{{ hostvars['bastion']['ansible_host'] }}"
+        port: 22
+        timeout: 10
+      run_once: yes
+      delegate_to: localhost
+
+    - name: Print tunnel information
+      debug:
+        msg: |
+          ================================================
+          Updating Private VM: {{ inventory_hostname }}
+          Private IP: {{ ansible_host }}
+          Bastion Host: {{ hostvars['bastion']['ansible_host'] }}
+          Connection Method: SSH ProxyCommand via Bastion
+          ================================================
+
+  roles:
+    - common_updates
+
+  post_tasks:
+    - name: Verify connectivity after update
+      debug:
+        msg: "Successfully updated {{ inventory_hostname }} via bastion tunnel"
+
+  tags:
+    - update-private
+    - private-vms

@@ -1,0 +1,16 @@
+# Configuration for VMs in private subnets accessed via bastion
+---
+
+# Bastion host configuration for SSH ProxyCommand
+bastion_host: bastion
+bastion_user: ubuntu
+bastion_port: 22
+
+# Ansible connection settings for private VMs
+# These use SSH ProxyCommand to tunnel through bastion
+ansible_ssh_common_args: >
+  -o ProxyCommand="ssh -W %h:%p
+  -i ~/.ssh/adnsg-aws-ai-platform.pem
+  -o StrictHostKeyChecking=no
+  -o UserKnownHostsFile=/dev/null
+  {{ bastion_user }}@{{ hostvars['bastion']['ansible_host'] }}"

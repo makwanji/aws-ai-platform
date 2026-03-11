@@ -1,0 +1,17 @@
+# Configuration specific to GPU nodes
+---
+
+# GPU update settings
+update_gpu_drivers: yes
+nvidia_driver_version: "latest"  # or specify version like "550.54.14"
+cuda_version: "12.4"
+
+# GPU node specific packages
+gpu_packages:
+  - nvidia-driver-latest-dkms
+  - cuda
+  - cuda-toolkit
+
+# Reboot GPU nodes after driver updates (recommended)
+gpu_reboot_after_driver_update: yes
+gpu_reboot_wait_timeout: 300

@@ -1,0 +1,76 @@
+---
+# Playbook: Update GPU driver and CUDA toolkit on GPU nodes
+# Usage: ansible-playbook playbooks/update_gpu_drivers.yml
+# Usage with options: ansible-playbook playbooks/update_gpu_drivers.yml --extra-vars "nvidia_driver_version=550.54.14"
+
+- name: Update GPU drivers and CUDA toolkit
+  hosts: gpu_nodes
+  serial: 1  # Update one GPU node at a time
+  gather_facts: yes
+
+  vars:
+    # GPU specific variables - can be overridden with --extra-vars
+    update_gpu_drivers: yes
+    nvidia_driver_version: "latest"
+    cuda_version: "12.4"
+    install_cuda_toolkit: yes
+    gpu_reboot_after_driver_update: yes
+    verify_gpu_installation: yes
+
+  pre_tasks:
+    - name: Check GPU availability
+      shell: nvidia-smi --query-gpu=count --format=csv,noheader
+      register: gpu_count
+      changed_when: false
+      failed_when: gpu_count.rc != 0
+      ignore_errors: yes
+
+    - name: Display GPU info before update
+      debug:
+        msg: |
+          ================================================
+          GPU Driver Update Starting on {{ inventory_hostname }}
+          Time: {{ ansible_date_time.iso8601 }}
+          Available GPUs: {{ gpu_count.stdout | default('N/A') }}
+          Driver Version to Install: {{ nvidia_driver_version }}
+          CUDA Version: {{ cuda_version }}
+          ================================================
+
+    - name: Backup GPU configuration
+      shell: |
+        nvidia-smi query > /tmp/gpu_config_before.txt 2>/dev/null || true
+        nvidia-smi -q -d compute > /tmp/gpu_status_before.txt 2>/dev/null || true
+      changed_when: false
+
+  roles:
+    - gpu_updates
+
+  post_tasks:
+    - name: Get GPU info after update
+      shell: nvidia-smi --query-gpu=index,name,driver_version,memory.total --format=csv,noheader
+      register: gpu_info_after
+      changed_when: false
+      failed_when: gpu_info_after.rc != 0
+
+    - name: Get CUDA version after update
+      shell: nvcc --version
+      register: cuda_info_after
+      changed_when: false
+      failed_when: cuda_info_after.rc != 0
+      ignore_errors: yes
+
+    - name: Display GPU update results
+      debug:
+        msg: |
+          ================================================
+          GPU Driver Update Completed on {{ inventory_hostname }}
+          Time: {{ ansible_date_time.iso8601 }}
+          GPU Information:
+          {{ gpu_info_after.stdout }}
+          CUDA Information:
+          {{ cuda_info_after.stdout | default('N/A') }}
+          ================================================
+
+  tags:
+    - update-gpu
+    - gpu-drivers

@@ -1,0 +1,70 @@
+---
+# Playbook: Update all systems (OS packages and security patches)
+# Usage: ansible-playbook playbooks/update_all_systems.yml
+# Usage with options: ansible-playbook playbooks/update_all_systems.yml --extra-vars "reboot_after_update=true"
+
+- name: Update all systems in the AI Platform
+  hosts: all
+  serial: 1  # Update one host at a time to maintain availability
+  gather_facts: yes
+
+  vars:
+    # Default variables - can be overridden with --extra-vars
+    reboot_after_update: no
+    update_security_only: no
+    enable_update_logging: yes
+    run_pre_update_checks: yes
+    run_post_update_checks: yes
+
+  pre_tasks:
+    - name: Set facts for update run
+      set_fact:
+        update_start_time: "{{ ansible_date_time.iso8601 }}"
+        update_host: "{{ inventory_hostname }}"
+
+    - name: Print update start message
+      debug:
+        msg: |
+          ================================================
+          Starting system update on {{ inventory_hostname }}
+          Time: {{ update_start_time }}
+          Reboot After Update: {{ reboot_after_update }}
+          Security-Only Updates: {{ update_security_only }}
+          ================================================
+
+    - name: Send update notification (example)
+      debug:
+        msg: "Update process starting on {{ inventory_hostname }}"
+
+  roles:
+    - common_updates
+
+  post_tasks:
+    - name: Print update completion message
+      debug:
+        msg: |
+          ================================================
+          Update completed on {{ inventory_hostname }}
+          Time: {{ ansible_date_time.iso8601 }}
+          ================================================
+
+    - name: Final system status
+      shell: |
+        echo "=== System Information ==="
+        uname -a
+        echo ""
+        echo "=== Uptime ==="
+        uptime
+        echo ""
+        echo "=== Free Memory ==="
+        free -h
+      register: final_status
+      changed_when: false
+
+    - name: Display final system status
+      debug:
+        msg: "{{ final_status.stdout }}"
+
+  tags:
+    - update-systems
+    - common-updates
